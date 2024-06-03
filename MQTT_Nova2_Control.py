@@ -37,10 +37,10 @@ class MQTTWin(object):
         self.global_state["connect"] = False
 
         self.root = root
-        self.root.title("Config MQTT")
+        self.root.title("MQTT-Nova2 Controller")
         self.root.geometry("600x800")
 
-        self.mqbutton = Button(self.root, text="Connect", padx=5,
+        self.mqbutton = Button(self.root, text="Conn DOBOT", padx=5,
                              command=self.my_connect)
         self.mqbutton.grid(row=0,column=0,padx=2,pady=10)
 
@@ -81,6 +81,8 @@ class MQTTWin(object):
 
 #        self.set_label(self.frame_feed, text="%", rely=0.05, x=175)
 
+
+
         self.xplus = Button(self.root, text="DefaultPose", padx=5,
                              command=self.defaultPose)
         self.xplus.grid(row=2,column=0,padx=2,pady=10)
@@ -89,6 +91,13 @@ class MQTTWin(object):
                              command=self.setDefPose)
         self.yplus.grid(row=2,column=1,padx=2,pady=10)
 
+        self.enb = Button(self.root, text="EnableRobot", padx=5,
+                             command=self.enableRobot)
+        self.enb.grid(row=2,column=3,padx=2,pady=10)
+
+        self.enb = Button(self.root, text="DisableRobot", padx=5,
+                             command=self.disableRobot)
+        self.enb.grid(row=2,column=4,padx=2,pady=10)
 
         self.text_log = tk.scrolledtext.ScrolledText(self.root,width=70,height=60)
         self.text_log.grid(row=3,column =0, padx=10, pady=10,columnspan=7)
@@ -109,12 +118,22 @@ class MQTTWin(object):
         self.defPose = self.getPose()
         print("CurrentPose:",self.defPose)
 
+    def enableRobot(self): # 
+        ret = self.client_dash.EnableRobot(0.5,0,0,0)
+        print(ret)
+    def disableRobot(self): # 
+        ret = self.client_dash.DisableRobot()
+        print(ret)
+
+
     def my_connect(self):
         # need try
         self.client_dash = DobotApiDashboard(
                     "192.168.5.1", 29999, self.text_log)
         self.client_feed = DobotApiFeedBack(
                     "192.168.5.1", 30004,self.text_log)
+
+        #ServoP only accepted in this port.
         self.client_move = DobotApiDashboard("192.168.5.1", 30003, self.text_log)
 
 
@@ -181,13 +200,6 @@ class MQTTWin(object):
     def on_message(self,client, userdata, msg):
         js = json.loads(msg.payload)
 #        print("Message!",js)
-        if 'pad' in js:
-            pd = js['pad']
-            if pd['bA']:
-                print("reset")
-                self.resetRobot()
-            if pd['b0']==1:
-                return
 
         if 'pos' in js:
             x = js['pos']['x']
@@ -214,12 +226,20 @@ class MQTTWin(object):
             dyd = yd-self.lyd
             dzd = zd-self.lzd
             print(dxd,dyd,dzd)
-            sc = 1100
+            sc = 1100  # ちょっと誇張
             dx *= sc
             dy *= sc
             dz *= sc
 #            print(dx,dy,dz)
-            self.relativeMove(dx,dy,dz,dxd*160,dyd*160,dzd*160)
+
+            if 'pad' in js:
+                pd = js['pad']
+                if pd['bA']:
+                    print("reset")
+                    self.resetRobot()
+                if pd['b0']!=1:
+                    self.relativeMove(dx,dy,dz,dxd*180,dyd*180,-dzd*180)
+
             self.lx = x
             self.ly = y
             self.lz = z
@@ -289,7 +309,7 @@ class MQTTWin(object):
             pose[5]=str(float(pose[5])+zd)
             ret = self.client_move.sendRecvMsg("ServoP("+pose[0]+","+pose[1]+","+pose[2]+","+pose[3]+","+pose[4]+","+pose[5]+")")
             print(ret)
-            self.log_txt("Relavtive x:"+str(int(xd*100))+"y: "+str(int(yd*100))+" z:"+str(int(zd*100))+"\n")
+#            self.log_txt("Relavtive x:"+str(int(xd*100))+"y: "+str(int(yd*100))+" z:"+str(int(zd*100))+"\n")
 
 
     def enableRobot(self):
